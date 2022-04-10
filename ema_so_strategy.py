@@ -56,7 +56,7 @@ class Strategy():
         
         self.symbols = ["XRPEUR"]
         
-        self.units["XRPEUR"] = 5 
+        self.units["XRPEUR"] = 25 
         self.symbol_position["XRPEUR"] = 0
         
         # Setupt logging system
@@ -64,7 +64,7 @@ class Strategy():
         self.logSetup(create_file=True)
         
     def start_trading(self, historical_days):
-        
+        print("start_trading")
         self.twm = ThreadedWebsocketManager()
         self.twm.start()
         
@@ -106,7 +106,7 @@ class Strategy():
         self.logger = log 
         
     def get_most_recent(self, symbol, interval, days):
-    
+        print("get_most_recent")
         now = datetime.utcnow()
         past = str(now - timedelta(days = days))
     
@@ -125,6 +125,7 @@ class Strategy():
         self.data = df
     
     def stream_candles(self, msg):
+        #print("stream_candles")
         
         # extract the required items from msg
         event_time = pd.to_datetime(msg["E"], unit = "ms")
@@ -154,12 +155,12 @@ class Strategy():
         self.position_info[symbol] = {'profit': take_profit}
         self.position_info[symbol] = {'loss': stop_loss}
     
-    def execute_strategy(self, symbol):
+    def execute_EMA_SO_strategy(self, symbol):
         
-        
+        print("execute_strategy")
         if len(self.data) > 0:
             price = self.data["Close"].iloc[-1]   
-            
+            print(f"Symbol: {symbol}, Price: {price}")
             if self.symbol_position[symbol] == 1:
                 # Check wheter stop loss or take profit are triggered.
                 if price <= self.position_info[symbol]['loss']:
@@ -194,6 +195,42 @@ class Strategy():
         else: 
             self.logger.info("Not enough data to execute strategy..")
     
+    def execute_EMA_strategy(self, symbol): 
+        if len(self.data) > 0:
+            price = self.data["Close"].iloc[-1]   
+            
+            print(f"Symbol: {symbol}, current price: {price}")
+            if self.symbol_position[symbol] == 1:
+                # Check wheter stop loss or take profit are triggered.
+                if price <= self.position_info[symbol]['loss']:
+                    print(2 * "\n" + 100* "-")
+                    print(f"STOP LOSS TRIGGERED.")
+                    order = self.client.create_order(symbol = symbol, side = "SELL", type = "MARKET", quantity = self.units[symbol])
+                    self.report_trade(order, "GOING NEUTRAL") 
+                    self.symbol_position[symbol] = 0  # neutral position
+                    
+                elif price >= self.position_info[symbol]["profit"]:
+                    print(2 * "\n" + 100* "-")
+                    print(f"TAKE PROFIT TRIGGERED.")
+                    order = self.client.create_order(symbol = symbol, side = "SELL", type = "MARKET", quantity = self.units[symbol])
+                    self.report_trade(order, "GOING NEUTRAL") 
+                    self.symbol_position[symbol] = 0  # neutral position
+                    
+                if (self.EMA_strategy() == "Sell"):
+                    order = self.client.create_order(symbol = symbol, side = "SELL", type = "MARKET", quantity = self.units[symbol])
+                    self.report_trade(order, "GOING NEUTRAL")                    
+                    self.symbol_position[symbol] = 0  # neutral position
+                    
+            elif self.symbol_position[symbol] == 0:
+                if (self.EMA_strategy() == "Buy"): # Signal to go long
+                    order = self.client.create_order(symbol = symbol, side = "BUY", type = "MARKET", quantity = self.units[symbol])
+                    self.report_trade(order, "GOING LONG")  
+                    self.symbol_position[symbol] = 1  # long position
+                    
+                    self.position_info[symbol] = {}
+                    self.store_position_data(price, symbol)
+        else: 
+            print("Not enough data to execute strategy..")
     def SO_strategy(self):
         signal = ""
         df = self.data.copy()
@@ -255,6 +292,8 @@ class Strategy():
 if __name__ == "__main__":
     symbol="XRPEUR"
     bar_length="5m"
-    position = 0
+    position = 1
     trader = Strategy(symbol = symbol, bar_length = bar_length,  position = position)
     trader.start_trading(historical_days=1)
+    trader.twm.join()
+        
