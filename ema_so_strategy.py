@@ -11,10 +11,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import time
 import logging
-
-real_api_key = 'jE86Ni9biRKFsIVsa6gUnIBdPsX6b9pEmpDx0sMEhEqQnYXX26JCtOIsbBdgY6mo'
-real_api_secret = '7Rtc4vWaU0RcN9Zn4pXKaFjZahCWBrterQJs93V9hccO5t0Q60Jdn7FrhH2icynz'
-
+import os
 
 class Strategy():
     
@@ -27,6 +24,7 @@ class Strategy():
         self.trades = 0 
         self.trade_values = []
         self.symbol_position = {}
+        
         #*****************add strategy-specific attributes here******************
         '''
         Parameters of EMA Strategy:
@@ -42,9 +40,13 @@ class Strategy():
         '''
         self.SO_periods = SO_periods
         self.SO_D_mw = SO_D_mw
+        
         #************************************************************************
-    
-        self.client = Client(api_key = real_api_key, api_secret = real_api_secret, tld = "com", testnet = False)
+        # load the binance client public and secret keys (must be exported previously)
+        api_key = os.environ.get('binance_api')
+        api_secret = os.environ.get('binance_secret')
+        # init the binance client
+        self.client = Client(api_key = api_key, api_secret = api_secret, tld = "com", testnet = False)
                 
             
         self.orders = {}
@@ -231,6 +233,7 @@ class Strategy():
                     self.store_position_data(price, symbol)
         else: 
             print("Not enough data to execute strategy..")
+            
     def SO_strategy(self):
         signal = ""
         df = self.data.copy()
